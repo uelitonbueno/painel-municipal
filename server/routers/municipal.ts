@@ -30,8 +30,20 @@ export function hasMunicipalPermission(role: "viewer" | "editor" | "admin" | und
   return required === "admin" ? role === "admin" : role === "editor" || role === "admin";
 }
 
-async function assertTenantAccess(userId: number, tenantId: string, required: "editor" | "admin" = "editor") {
-  const membership = await db.getMembership(userId, tenantId);
+export function hasMunicipalReadAccess(role: "viewer" | "editor" | "admin" | undefined) {
+  return Boolean(role);
+}
+
+async function assertTenantReadAccess(user: { id: number; role: "user" | "admin" }, tenantId: string) {
+  if (user.role === "admin") return { role: "admin" as const };
+  const membership = await db.getMembership(user.id, tenantId);
+  if (!hasMunicipalReadAccess(membership?.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta não possui acesso a esta prefeitura." });
+  return membership;
+}
+
+async function assertTenantAccess(user: { id: number; role: "user" | "admin" }, tenantId: string, required: "editor" | "admin" = "editor") {
+  if (user.role === "admin") return { role: "admin" as const };
+  const membership = await db.getMembership(user.id, tenantId);
   if (!hasMunicipalPermission(membership?.role, required)) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta não possui permissão de gestão nesta prefeitura." });
   return membership;
 }
@@ -51,32 +63,32 @@ const membershipRemovalForm = z.object({ tenantId: z.string().min(1), membership
 
 export const municipalRouter = router({
   public: router({
-    municipalities: publicProcedure.query(() => db.listMunicipalities()),
-    dashboard: publicProcedure.input(z.object({ tenantId: z.string().optional() }).optional()).query(({ input }) => db.getPublicDashboard(input?.tenantId)),
-    indicators: publicProcedure.input(z.object({ tenantId: z.string().optional() }).optional()).query(({ input }) => db.getPublicIndicators(input?.tenantId)),
-    transparency: publicProcedure.input(z.object({ tenantId: z.string().optional(), type: transparencyTypeSchema.optional(), category: z.string().optional(), from: z.string().optional(), to: z.string().optional() }).optional()).query(({ input }) => db.listTransparency(input ?? {})),
-    services: publicProcedure.input(z.object({ tenantId: z.string().optional() }).optional()).query(({ input }) => db.listServices(input?.tenantId)),
+    municipalities: protectedProcedure.query(({ ctx }) => db.listMunicipalitiesForUser(ctx.user.id, ctx.user.role === "admin")),
+    dashboard: protectedProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.getPublicDashboard(input.tenantId); }),
+    indicators: protectedProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.getPublicIndicators(input.tenantId); }),
+    transparency: protectedProcedure.input(tenantInput.extend({ type: transparencyTypeSchema.optional(), category: z.string().optional(), from: z.string().optional(), to: z.string().optional() })).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.listTransparency(input); }),
+    services: protectedProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.listServices(input.tenantId); }),
   }),
   admin: router({
-    overview: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.getAdminOverview(input.tenantId); }),
-    projects: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.listProjects(input.tenantId); }),
-    indicators: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.getPublicIndicators(input.tenantId, true); }),
-    transparency: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.listTransparency({ tenantId: input.tenantId, includePrivate: true }); }),
-    services: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.listServices(input.tenantId, true); }),
-    receipts: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId); return db.listReceipts(input.tenantId); }),
-    members: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); return db.listMunicipalityMembers(input.tenantId); }),
+    overview: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.getAdminOverview(input.tenantId); }),
+    projects: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.listProjects(input.tenantId); }),
+    indicators: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.getPublicIndicators(input.tenantId, true); }),
+    transparency: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.listTransparency({ tenantId: input.tenantId, includePrivate: true }); }),
+    services: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.listServices(input.tenantId, true); }),
+    receipts: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.listReceipts(input.tenantId); }),
+    members: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.listMunicipalityMembers(input.tenantId); }),
     createMunicipality: platformAdminProcedure.input(municipalityForm).mutation(async ({ ctx, input }) => { const municipality = await db.createMunicipality(input); await db.assignOwnerMembership(ctx.user.id, municipality.id); return municipality; }),
-    createProject: adminProcedure.input(projectForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.createProject({ ...input, budget: input.budget?.toFixed(2) ?? null, description: input.description || null, startDate: input.startDate || null, targetDate: input.targetDate || null }); }),
-    updateProject: adminProcedure.input(projectForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); const { id, ...values } = input; await db.updateProject(id, input.tenantId, { ...values, budget: values.budget?.toFixed(2) ?? null, description: values.description || null, startDate: values.startDate || null, targetDate: values.targetDate || null }); }),
-    createIndicator: adminProcedure.input(indicatorForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.createIndicator({ ...input, description: input.description || null }); }),
-    updateIndicator: adminProcedure.input(indicatorForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); const { id, ...values } = input; await db.updateIndicator(id, input.tenantId, { ...values, description: values.description || null }); }),
-    createMeasurement: adminProcedure.input(measurementForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.createMeasurement({ ...input, value: input.value.toFixed(2), notes: input.notes || null }); }),
-    createTransparency: adminProcedure.input(transparencyForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.createTransparencyRecord({ ...input, amount: input.amount.toFixed(2), referenceNumber: input.referenceNumber || null, supplier: input.supplier || null, description: input.description || null }); }),
-    updateTransparency: adminProcedure.input(transparencyForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); const { id, ...values } = input; await db.updateTransparencyRecord(id, input.tenantId, { ...values, amount: values.amount.toFixed(2), referenceNumber: values.referenceNumber || null, supplier: values.supplier || null, description: values.description || null }); }),
-    createService: adminProcedure.input(serviceForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.createService({ ...input, description: input.description, accessInstructions: input.accessInstructions, digitalUrl: input.digitalUrl || null, phone: input.phone || null }); }),
-    updateService: adminProcedure.input(serviceForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); const { id, ...values } = input; await db.updateService(id, input.tenantId, { ...values, digitalUrl: values.digitalUrl || null, phone: values.phone || null }); }),
-    recordReceipt: adminProcedure.input(receiptForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); return db.recordIngestion(input); }),
-    assignMember: adminProcedure.input(membershipForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); return db.assignMembershipByEmail({ municipalityId: input.tenantId, email: input.email, role: input.role }); }),
-    removeMember: adminProcedure.input(membershipRemovalForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user.id, input.tenantId, "admin"); await db.removeMembership(input.membershipId, input.tenantId); return { success: true } as const; }),
+    createProject: adminProcedure.input(projectForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createProject({ ...input, budget: input.budget?.toFixed(2) ?? null, description: input.description || null, startDate: input.startDate || null, targetDate: input.targetDate || null }); }),
+    updateProject: adminProcedure.input(projectForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); const { id, ...values } = input; await db.updateProject(id, input.tenantId, { ...values, budget: values.budget?.toFixed(2) ?? null, description: values.description || null, startDate: values.startDate || null, targetDate: values.targetDate || null }); }),
+    createIndicator: adminProcedure.input(indicatorForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createIndicator({ ...input, description: input.description || null }); }),
+    updateIndicator: adminProcedure.input(indicatorForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); const { id, ...values } = input; await db.updateIndicator(id, input.tenantId, { ...values, description: values.description || null }); }),
+    createMeasurement: adminProcedure.input(measurementForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createMeasurement({ ...input, value: input.value.toFixed(2), notes: input.notes || null }); }),
+    createTransparency: adminProcedure.input(transparencyForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createTransparencyRecord({ ...input, amount: input.amount.toFixed(2), referenceNumber: input.referenceNumber || null, supplier: input.supplier || null, description: input.description || null }); }),
+    updateTransparency: adminProcedure.input(transparencyForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); const { id, ...values } = input; await db.updateTransparencyRecord(id, input.tenantId, { ...values, amount: values.amount.toFixed(2), referenceNumber: values.referenceNumber || null, supplier: values.supplier || null, description: values.description || null }); }),
+    createService: adminProcedure.input(serviceForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createService({ ...input, description: input.description, accessInstructions: input.accessInstructions, digitalUrl: input.digitalUrl || null, phone: input.phone || null }); }),
+    updateService: adminProcedure.input(serviceForm.extend({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); const { id, ...values } = input; await db.updateService(id, input.tenantId, { ...values, digitalUrl: values.digitalUrl || null, phone: values.phone || null }); }),
+    recordReceipt: adminProcedure.input(receiptForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.recordIngestion(input); }),
+    assignMember: adminProcedure.input(membershipForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.assignMembershipByEmail({ municipalityId: input.tenantId, email: input.email, role: input.role }); }),
+    removeMember: adminProcedure.input(membershipRemovalForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.removeMembership(input.membershipId, input.tenantId); return { success: true } as const; }),
   }),
 });

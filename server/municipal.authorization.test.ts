@@ -7,13 +7,15 @@ const mocks = vi.hoisted(() => ({
   createProject: vi.fn(),
   recordIngestion: vi.fn(),
   listReceipts: vi.fn(),
+  listMunicipalitiesForUser: vi.fn(),
+  getPublicDashboard: vi.fn(),
 }));
 
 vi.mock("./db", () => mocks);
 
 import { municipalRouter } from "./routers/municipal";
 
-function context() {
+function context(role: "user" | "admin" = "user") {
   return {
     user: {
       id: 7,
@@ -21,7 +23,7 @@ function context() {
       name: "Teste Municipal",
       email: "teste@municipio.gov.br",
       loginMethod: "manus",
-      role: "user",
+      role,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),
@@ -30,6 +32,36 @@ function context() {
     res: {} as TrpcContext["res"],
   } as TrpcContext;
 }
+
+function anonymousContext() {
+  return { user: null, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] } as TrpcContext;
+}
+
+describe("municipal.public security", () => {
+  it("exige login antes de listar qualquer prefeitura", async () => {
+    const caller = municipalRouter.createCaller(anonymousContext());
+    await expect(caller.public.municipalities()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("nega consulta de uma prefeitura sem vínculo", async () => {
+    mocks.getMembership.mockResolvedValue(undefined);
+    const caller = municipalRouter.createCaller(context());
+    await expect(caller.public.dashboard({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.getPublicDashboard).not.toHaveBeenCalled();
+  });
+
+  it("mostra somente as prefeituras vinculadas ao usuário e permite visão transversal ao superusuário", async () => {
+    mocks.listMunicipalitiesForUser.mockResolvedValue([{ id: "mun-001", name: "Prefeitura A" }]);
+    mocks.getPublicDashboard.mockResolvedValue({ municipality: { id: "mun-002" }, stats: null, revenueSeries: [], updatedAt: null });
+    const userCaller = municipalRouter.createCaller(context());
+    const superCaller = municipalRouter.createCaller(context("admin"));
+
+    await expect(userCaller.public.municipalities()).resolves.toEqual([{ id: "mun-001", name: "Prefeitura A" }]);
+    await expect(superCaller.public.dashboard({ tenantId: "mun-002" })).resolves.toMatchObject({ municipality: { id: "mun-002" } });
+    expect(mocks.listMunicipalitiesForUser).toHaveBeenCalledWith(7, false);
+    expect(mocks.getPublicDashboard).toHaveBeenCalledWith("mun-002");
+  });
+});
 
 describe("municipal.admin authorization", () => {
   it("nega consulta administrativa a um vínculo viewer", async () => {

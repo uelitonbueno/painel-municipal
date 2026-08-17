@@ -57,10 +57,10 @@ export async function getUserByOpenId(openId: string) {
 
 const numberValue = (value: string | number | null | undefined) => Number(value ?? 0);
 
-async function resolveMunicipality(tenantId?: string) {
+async function resolveMunicipality(tenantId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const query = db.select().from(municipalities).where(tenantId ? and(eq(municipalities.id, tenantId), eq(municipalities.active, true)) : eq(municipalities.active, true));
+  const query = db.select().from(municipalities).where(and(eq(municipalities.id, tenantId), eq(municipalities.active, true)));
   return (await query.limit(1))[0];
 }
 
@@ -70,7 +70,14 @@ export async function listMunicipalities() {
   return db.select().from(municipalities).where(eq(municipalities.active, true)).orderBy(municipalities.name);
 }
 
-export async function getPublicDashboard(tenantId?: string) {
+export async function listMunicipalitiesForUser(userId: number, isSuperUser: boolean) {
+  const db = await getDb();
+  if (!db) return [];
+  if (isSuperUser) return listMunicipalities();
+  return db.select({ id: municipalities.id, name: municipalities.name, state: municipalities.state, population: municipalities.population }).from(municipalities).innerJoin(municipalityMemberships, eq(municipalityMemberships.municipalityId, municipalities.id)).where(and(eq(municipalities.active, true), eq(municipalityMemberships.userId, userId))).orderBy(municipalities.name);
+}
+
+export async function getPublicDashboard(tenantId: string) {
   const db = await getDb();
   const municipality = await resolveMunicipality(tenantId);
   if (!db || !municipality) {
@@ -105,7 +112,7 @@ export async function getPublicDashboard(tenantId?: string) {
   };
 }
 
-export async function getPublicIndicators(tenantId?: string, includePrivate = false) {
+export async function getPublicIndicators(tenantId: string, includePrivate = false) {
   const db = await getDb();
   const municipality = await resolveMunicipality(tenantId);
   if (!db || !municipality) return { municipality: null, indicators: [] };
@@ -124,7 +131,7 @@ export async function getPublicIndicators(tenantId?: string, includePrivate = fa
 }
 
 export async function listTransparency(params: {
-  tenantId?: string;
+  tenantId: string;
   includePrivate?: boolean;
   type?: "contract" | "bid" | "expense" | "revenue";
   category?: string;
@@ -146,7 +153,7 @@ export async function listTransparency(params: {
   };
 }
 
-export async function listServices(tenantId?: string, includePrivate = false) {
+export async function listServices(tenantId: string, includePrivate = false) {
   const db = await getDb();
   const municipality = await resolveMunicipality(tenantId);
   if (!db || !municipality) return { municipality: null, services: [] };
@@ -234,6 +241,10 @@ export async function assignMembershipByEmail(input: { municipalityId: string; e
   if (!db) throw new Error("Banco de dados indisponível");
   const user = (await db.select().from(users).where(eq(users.email, input.email)).limit(1))[0];
   if (!user) throw new Error("Nenhum usuário autenticado foi encontrado com este e-mail.");
+  if (user.role !== "admin") {
+    const existingMemberships = await db.select().from(municipalityMemberships).where(eq(municipalityMemberships.userId, user.id));
+    if (existingMemberships.some(membership => membership.municipalityId !== input.municipalityId)) throw new Error("Usuários comuns podem ser vinculados a apenas uma prefeitura. Use um superusuário para acesso multi-prefeitura.");
+  }
   await db.insert(municipalityMemberships).values({ userId: user.id, municipalityId: input.municipalityId, role: input.role }).onDuplicateKeyUpdate({ set: { role: input.role } });
   return { id: user.id, name: user.name, email: user.email, role: input.role };
 }

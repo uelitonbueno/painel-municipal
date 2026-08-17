@@ -27,3 +27,11 @@
 - [x] Adicionar testes do procedimento de recebimentos para criação, duplicidade por chave idempotente e consulta posterior do histórico.
 - [x] Validar o painel administrativo em viewport mobile e registrar a verificação visual completa das rotas principais.
 - [x] Criar um checkpoint final do projeto com todos os itens concluídos.
+- [x] Substituir o acesso público aos dados por autenticação obrigatória em todas as rotas de consulta e gestão.
+- [x] Definir e aplicar o perfil de superusuário com visão transversal de prefeituras, mantendo usuários comuns restritos ao próprio vínculo municipal.
+- [x] Garantir que usuários autenticados sem vínculo municipal não visualizem dados ou opções de outra prefeitura.
+- [x] Impedir que usuários comuns sejam vinculados a mais de uma prefeitura e reservar a visão multi-prefeitura ao superusuário.
+- [x] Ajustar as interfaces pública e administrativa para exibir apenas o contexto municipal autorizado após o login.
+- [x] Criar testes para acesso negado sem login, isolamento entre prefeituras e acesso ampliado de superusuário.
+- [x] Validar visualmente a experiência autenticada e salvar um checkpoint seguro atualizado.
+- [x] Salvar um checkpoint seguro após as mudanças de autenticação obrigatória, isolamento por prefeitura e acesso de superusuário.

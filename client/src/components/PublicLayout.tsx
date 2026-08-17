@@ -1,5 +1,6 @@
 import { useMunicipality } from "@/contexts/MunicipalityContext";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, LayoutDashboard, Menu, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useState } from "react";
@@ -47,12 +48,13 @@ export function MunicipalitySwitcher({ compact = false }: { compact?: boolean })
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
   return (
     <div className="min-h-screen bg-[#f5f8f7] text-[#173c40]">
       <header className="sticky top-0 z-50 border-b border-[#dbe9e8]/80 bg-[#f5f8f7]/92 backdrop-blur-xl">
         <div className="container flex h-[74px] items-center justify-between gap-5">
           <Brand />
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Navegação pública">
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Navegação autenticada">
             {links.map(link => (
               <Link key={link.href} href={link.href} className={`rounded-full px-3 py-2 text-sm font-medium transition-colors ${location === link.href ? "bg-[#e0f0ee] text-[#075e66]" : "text-[#587073] hover:bg-white hover:text-[#173c40]"}`}>
                 {link.label}
@@ -63,9 +65,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <MunicipalitySwitcher />
             <Link href="/admin">
               <Button className="h-10 rounded-full bg-[#0b6672] px-4 text-xs font-semibold hover:bg-[#075e66]">
-                Área administrativa
+                Gestão municipal
               </Button>
             </Link>
+            <Button variant="ghost" onClick={() => void logout()} className="h-10 px-2 text-xs text-[#527174] hover:bg-white hover:text-[#173c40]">Sair</Button>
           </div>
           <button onClick={() => setIsMenuOpen(open => !open)} className="grid h-10 w-10 place-items-center rounded-lg border border-[#dbe9e8] bg-white text-[#0b6672] md:hidden" aria-label="Abrir menu">
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -73,9 +76,9 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </div>
         {isMenuOpen && (
           <div className="border-t border-[#dbe9e8] bg-white px-4 py-4 md:hidden">
-            <nav className="mx-auto grid max-w-xl gap-1" aria-label="Navegação pública móvel">
+            <nav className="mx-auto grid max-w-xl gap-1" aria-label="Navegação autenticada móvel">
               {links.map(link => <Link key={link.href} onClick={() => setIsMenuOpen(false)} href={link.href} className={`rounded-lg px-3 py-2.5 text-sm ${location === link.href ? "bg-[#e0f0ee] font-semibold text-[#075e66]" : "text-[#587073]"}`}>{link.label}</Link>)}
-              <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-[#e7f0ef] pt-4"><MunicipalitySwitcher compact /><Link href="/admin"><Button size="sm" className="bg-[#0b6672]">Área administrativa</Button></Link></div>
+              <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-[#e7f0ef] pt-4"><MunicipalitySwitcher compact /><Link href="/admin"><Button size="sm" className="bg-[#0b6672]">Gestão municipal</Button></Link><Button size="sm" variant="ghost" onClick={() => void logout()}>Sair</Button></div>
             </nav>
           </div>
         )}
@@ -83,8 +86,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       {children}
       <footer className="mt-16 border-t border-[#dbe9e8] bg-white">
         <div className="container flex flex-col gap-4 py-8 text-xs text-[#627a7d] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#0b7a73]" /> Informações públicas organizadas para consulta cidadã.</div>
-          <div className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4" /> Painel Municipal · gestão com responsabilidade</div>
+          <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#0b7a73]" /> Dados acessíveis somente em sessão autenticada.</div>
+          <div className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4" /> {user?.role === "admin" ? "Superusuário · visão ampliada" : "Prefeitura vinculada · acesso controlado"}</div>
         </div>
       </footer>
     </div>
