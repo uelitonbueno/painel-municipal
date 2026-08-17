@@ -26,4 +26,4 @@
 - [x] Criar uma linguagem visual elegante e refinada, com tipografia, espaçamentos, cards, tabelas e gráficos consistentes.
 - [x] Adicionar testes do procedimento de recebimentos para criação, duplicidade por chave idempotente e consulta posterior do histórico.
 - [x] Validar o painel administrativo em viewport mobile e registrar a verificação visual completa das rotas principais.
-- [ ] Criar um checkpoint final do projeto com todos os itens concluídos.
+- [x] Criar um checkpoint final do projeto com todos os itens concluídos.
