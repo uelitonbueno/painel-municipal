@@ -30,10 +30,13 @@ export const municipalities = mysqlTable("municipalities", {
   name: varchar("name", { length: 180 }).notNull(),
   state: varchar("state", { length: 2 }).notNull(),
   population: int("population"),
+  integrationTokenHash: varchar("integrationTokenHash", { length: 64 }),
+  integrationTokenHint: varchar("integrationTokenHint", { length: 12 }),
+  integrationTokenCreatedAt: timestamp("integrationTokenCreatedAt"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, table => [uniqueIndex("municipality_integration_token_hash_unique").on(table.integrationTokenHash)]);
 
 export const municipalityMemberships = mysqlTable(
   "municipality_memberships",
@@ -47,6 +50,24 @@ export const municipalityMemberships = mysqlTable(
   table => [
     uniqueIndex("membership_user_municipality_unique").on(table.userId, table.municipalityId),
     index("membership_municipality_idx").on(table.municipalityId),
+  ],
+);
+
+export const municipalAuthorizedUsers = mysqlTable(
+  "municipal_authorized_users",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    municipalityId: varchar("municipalityId", { length: 64 }).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    role: mysqlEnum("role", ["viewer", "editor", "admin"]).default("viewer").notNull(),
+    status: mysqlEnum("status", ["pending", "active"]).default("pending").notNull(),
+    userId: int("userId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    activatedAt: timestamp("activatedAt"),
+  },
+  table => [
+    uniqueIndex("authorized_user_email_unique").on(table.email),
+    index("authorized_user_municipality_idx").on(table.municipalityId),
   ],
 );
 

@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   listReceipts: vi.fn(),
   listMunicipalitiesForUser: vi.fn(),
   getPublicDashboard: vi.fn(),
+  authorizeMunicipalUser: vi.fn(),
+  createMunicipality: vi.fn(),
+  assignOwnerMembership: vi.fn(),
 }));
 
 vi.mock("./db", () => mocks);
@@ -64,6 +67,15 @@ describe("municipal.public security", () => {
 });
 
 describe("municipal.admin authorization", () => {
+  it("permite ao superusuário criar uma prefeitura e receber seu token de integração", async () => {
+    const municipality = { id: "mun-nova", name: "Prefeitura Exemplo", state: "PR", population: 12000, integrationToken: "pm_tokenmunicipalcomseguranca123456789" };
+    mocks.createMunicipality.mockResolvedValue(municipality);
+    const caller = municipalRouter.createCaller(context("admin"));
+
+    await expect(caller.admin.createMunicipality({ name: "Prefeitura Exemplo", state: "PR", population: 12000 })).resolves.toEqual(municipality);
+    expect(mocks.assignOwnerMembership).toHaveBeenCalledWith(7, "mun-nova");
+  });
+
   it("nega consulta administrativa a um vínculo viewer", async () => {
     mocks.getMembership.mockResolvedValue({ role: "viewer" });
     const caller = municipalRouter.createCaller(context());
@@ -88,6 +100,15 @@ describe("municipal.admin authorization", () => {
 
     await expect(caller.admin.createProject({ tenantId: "mun-001", title: "Praça central", area: "Infraestrutura", status: "planejado", progress: 0, public: true })).resolves.toBeUndefined();
     expect(mocks.createProject).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "mun-001", title: "Praça central" }));
+  });
+
+  it("permite ao administrador pré-cadastrar o e-mail que receberá acesso no primeiro login", async () => {
+    mocks.getMembership.mockResolvedValue({ role: "admin" });
+    mocks.authorizeMunicipalUser.mockResolvedValue({ email: "pessoa@prefeitura.gov.br", role: "viewer", status: "pending" });
+    const caller = municipalRouter.createCaller(context());
+
+    await expect(caller.admin.authorizeUser({ tenantId: "mun-001", email: "pessoa@prefeitura.gov.br", role: "viewer" })).resolves.toMatchObject({ status: "pending" });
+    expect(mocks.authorizeMunicipalUser).toHaveBeenCalledWith({ municipalityId: "mun-001", email: "pessoa@prefeitura.gov.br", role: "viewer" });
   });
 
   it("registra recebimento, retorna duplicidade e permite consultar o histórico", async () => {

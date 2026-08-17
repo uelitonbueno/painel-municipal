@@ -7,9 +7,9 @@ describe("contratos municipais", () => {
     expect(projectStatusSchema.safeParse("em execução").success).toBe(false);
   });
 
-  it("valida o envelope receptor genérico sem presumir campos da integração externa", () => {
+  it("valida o envelope receptor pelo token municipal sem aceitar identificação direta da prefeitura", () => {
     const result = receiverEnvelopeSchema.safeParse({
-      tenantId: "prefeitura-exemplo",
+      integrationToken: "pm_tokenmunicipalcomseguranca123456789",
       source: "script",
       resource: "indicadores",
       operation: "incremental",
@@ -17,6 +17,7 @@ describe("contratos municipais", () => {
       records: [{ id: "I-1", valor: 12 }],
     });
     expect(result.success).toBe(true);
+    expect(receiverEnvelopeSchema.safeParse({ ...result.data, integrationToken: "curto" }).success).toBe(false);
   });
 
   it("exige uma chave idempotente e ao menos um registro para a carga interna", () => {

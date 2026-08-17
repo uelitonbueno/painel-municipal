@@ -15,6 +15,13 @@
       "when": 1786988202357,
       "tag": "0001_famous_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786991684467,
+      "tag": "0002_harsh_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

@@ -35,3 +35,17 @@
 - [x] Criar testes para acesso negado sem login, isolamento entre prefeituras e acesso ampliado de superusuário.
 - [x] Validar visualmente a experiência autenticada e salvar um checkpoint seguro atualizado.
 - [x] Salvar um checkpoint seguro após as mudanças de autenticação obrigatória, isolamento por prefeitura e acesso de superusuário.
+- [x] Corrigir a autorização que bloqueia o superusuário ao criar uma prefeitura.
+- [x] Selecionar automaticamente a prefeitura recém-criada como contexto ativo no painel lateral.
+- [x] Criar teste do fluxo de interface de cadastro confirmando seleção da prefeitura e abertura do diálogo de token.
+- [x] Salvar checkpoint da correção de criação e seleção de prefeitura.
+- [x] Criar token de integração exclusivo e revogável para cada prefeitura.
+- [x] Exibir o token de integração na conclusão do cadastro da prefeitura, com ação para copiar e aviso de armazenamento seguro.
+- [x] Validar o token recebido no envelope JSON e identificar automaticamente a prefeitura de destino da carga.
+- [x] Criar testes do receptor JSON para token válido, token inválido e roteamento da carga para a prefeitura correta.
+- [x] Documentar o contrato JSON de integração com o campo de token municipal.
+- [x] Criar cadastro prévio de usuário autorizado por e-mail e prefeitura.
+- [x] Permitir que o administrador escolha o perfil municipal do usuário no cadastro.
+- [x] Associar automaticamente o login ao usuário pré-cadastrado quando o e-mail for correspondente.
+- [x] Exibir e gerenciar os usuários autorizados no painel da prefeitura.
+- [x] Criar teste do fluxo de autenticação ativando o vínculo pré-autorizado e bloqueando e-mail não cadastrado.

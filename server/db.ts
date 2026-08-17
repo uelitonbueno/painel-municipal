@@ -1,12 +1,14 @@
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { nanoid } from "nanoid";
+import { createHash, randomBytes } from "node:crypto";
 import {
   indicatorMeasurements,
   indicators,
   ingestionBatches,
   ingestionReceipts,
   InsertUser,
+  municipalAuthorizedUsers,
   municipalityMemberships,
   municipalities,
   municipalServices,
@@ -46,6 +48,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
   updateSet.role = values.role;
   await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  const persisted = (await db.select().from(users).where(eq(users.openId, user.openId)).limit(1))[0];
+  if (persisted?.email) await activateMunicipalUserAuthorization(persisted.id, persisted.email, persisted.role === "admin");
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -56,6 +60,38 @@ export async function getUserByOpenId(openId: string) {
 }
 
 const numberValue = (value: string | number | null | undefined) => Number(value ?? 0);
+
+export function generateMunicipalIntegrationToken() {
+  return `pm_${randomBytes(24).toString("base64url")}`;
+}
+
+export function hashMunicipalIntegrationToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function canActivateMunicipalAuthorization(existingMunicipalityIds: string[], authorizedMunicipalityId: string, isSuperUser: boolean) {
+  return isSuperUser || existingMunicipalityIds.every(municipalityId => municipalityId === authorizedMunicipalityId);
+}
+
+export function resolveAuthorizedLogin(authorization: { municipalityId: string } | undefined, existingMunicipalityIds: string[], isSuperUser: boolean) {
+  if (!authorization) return { activate: false as const };
+  return { activate: canActivateMunicipalAuthorization(existingMunicipalityIds, authorization.municipalityId, isSuperUser), municipalityId: authorization.municipalityId };
+}
+
+export async function executeAuthorizedLoginActivation(input: {
+  authorization: { id: number; municipalityId: string; role: "viewer" | "editor" | "admin" } | undefined;
+  userId: number;
+  existingMunicipalityIds: string[];
+  isSuperUser: boolean;
+  grantMembership: (municipalityId: string, role: "viewer" | "editor" | "admin") => Promise<void>;
+  markAuthorizationActive: (authorizationId: number) => Promise<void>;
+}) {
+  const activation = resolveAuthorizedLogin(input.authorization, input.existingMunicipalityIds, input.isSuperUser);
+  if (!activation.activate || !input.authorization) return false;
+  await input.grantMembership(activation.municipalityId, input.authorization.role);
+  await input.markAuthorizationActive(input.authorization.id);
+  return true;
+}
 
 async function resolveMunicipality(tenantId: string) {
   const db = await getDb();
@@ -75,6 +111,19 @@ export async function listMunicipalitiesForUser(userId: number, isSuperUser: boo
   if (!db) return [];
   if (isSuperUser) return listMunicipalities();
   return db.select({ id: municipalities.id, name: municipalities.name, state: municipalities.state, population: municipalities.population }).from(municipalities).innerJoin(municipalityMemberships, eq(municipalityMemberships.municipalityId, municipalities.id)).where(and(eq(municipalities.active, true), eq(municipalityMemberships.userId, userId))).orderBy(municipalities.name);
+}
+
+export async function getMunicipalityByIntegrationToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const tokenHash = hashMunicipalIntegrationToken(token);
+  return (await db.select().from(municipalities).where(and(eq(municipalities.integrationTokenHash, tokenHash), eq(municipalities.active, true))).limit(1))[0];
+}
+
+export async function getMunicipalityIntegrationTokenInfo(municipalityId: string) {
+  const municipality = await resolveMunicipality(municipalityId);
+  if (!municipality) return undefined;
+  return { tokenConfigured: Boolean(municipality.integrationTokenHash), tokenHint: municipality.integrationTokenHint, createdAt: municipality.integrationTokenCreatedAt };
 }
 
 export async function getPublicDashboard(tenantId: string) {
@@ -236,6 +285,56 @@ export async function listMunicipalityMembers(municipalityId: string) {
   return db.select({ id: municipalityMemberships.id, role: municipalityMemberships.role, userId: users.id, name: users.name, email: users.email }).from(municipalityMemberships).innerJoin(users, eq(municipalityMemberships.userId, users.id)).where(eq(municipalityMemberships.municipalityId, municipalityId)).orderBy(users.name);
 }
 
+export async function listMunicipalAuthorizedUsers(municipalityId: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: municipalAuthorizedUsers.id, email: municipalAuthorizedUsers.email, role: municipalAuthorizedUsers.role, status: municipalAuthorizedUsers.status, userId: municipalAuthorizedUsers.userId, createdAt: municipalAuthorizedUsers.createdAt, activatedAt: municipalAuthorizedUsers.activatedAt, name: users.name }).from(municipalAuthorizedUsers).leftJoin(users, eq(municipalAuthorizedUsers.userId, users.id)).where(eq(municipalAuthorizedUsers.municipalityId, municipalityId)).orderBy(municipalAuthorizedUsers.email);
+}
+
+export async function authorizeMunicipalUser(input: { municipalityId: string; email: string; role: "viewer" | "editor" | "admin" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const email = input.email.trim().toLowerCase();
+  const existingAuthorization = (await db.select().from(municipalAuthorizedUsers).where(eq(municipalAuthorizedUsers.email, email)).limit(1))[0];
+  if (existingAuthorization && existingAuthorization.municipalityId !== input.municipalityId) throw new Error("Este e-mail já está autorizado para outra prefeitura.");
+  const account = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+  if (account && account.role !== "admin") {
+    const memberships = await db.select().from(municipalityMemberships).where(eq(municipalityMemberships.userId, account.id));
+    if (memberships.some(membership => membership.municipalityId !== input.municipalityId)) throw new Error("Este usuário já possui vínculo com outra prefeitura.");
+  }
+  const status = account ? "active" : "pending";
+  await db.insert(municipalAuthorizedUsers).values({ municipalityId: input.municipalityId, email, role: input.role, status, userId: account?.id ?? null, activatedAt: account ? new Date() : null }).onDuplicateKeyUpdate({ set: { role: input.role, status, userId: account?.id ?? null, activatedAt: account ? new Date() : null } });
+  if (account) await db.insert(municipalityMemberships).values({ userId: account.id, municipalityId: input.municipalityId, role: input.role }).onDuplicateKeyUpdate({ set: { role: input.role } });
+  return { email, role: input.role, status, name: account?.name ?? null };
+}
+
+export async function activateMunicipalUserAuthorization(userId: number, email: string, isSuperUser: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  const authorization = (await db.select().from(municipalAuthorizedUsers).where(eq(municipalAuthorizedUsers.email, email.trim().toLowerCase())).limit(1))[0];
+  const memberships = await db.select().from(municipalityMemberships).where(eq(municipalityMemberships.userId, userId));
+  await executeAuthorizedLoginActivation({
+    authorization,
+    userId,
+    existingMunicipalityIds: memberships.map(membership => membership.municipalityId),
+    isSuperUser,
+    grantMembership: async (municipalityId, role) => { await db.insert(municipalityMemberships).values({ userId, municipalityId, role }).onDuplicateKeyUpdate({ set: { role } }); },
+    markAuthorizationActive: async authorizationId => { await db.update(municipalAuthorizedUsers).set({ userId, status: "active", activatedAt: new Date() }).where(eq(municipalAuthorizedUsers.id, authorizationId)); },
+  });
+}
+
+export async function removeMunicipalAuthorizedUser(id: number, municipalityId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const authorization = (await db.select().from(municipalAuthorizedUsers).where(and(eq(municipalAuthorizedUsers.id, id), eq(municipalAuthorizedUsers.municipalityId, municipalityId))).limit(1))[0];
+  if (!authorization) return;
+  if (authorization.userId) {
+    const membership = (await db.select().from(municipalityMemberships).where(and(eq(municipalityMemberships.userId, authorization.userId), eq(municipalityMemberships.municipalityId, municipalityId))).limit(1))[0];
+    if (membership) await removeMembership(membership.id, municipalityId);
+  }
+  await db.delete(municipalAuthorizedUsers).where(eq(municipalAuthorizedUsers.id, id));
+}
+
 export async function assignMembershipByEmail(input: { municipalityId: string; email: string; role: "viewer" | "editor" | "admin" }) {
   const db = await getDb();
   if (!db) throw new Error("Banco de dados indisponível");
@@ -265,8 +364,19 @@ export async function createMunicipality(input: { name: string; state: string; p
   const db = await getDb();
   if (!db) throw new Error("Banco de dados indisponível");
   const id = `mun-${nanoid(10).toLowerCase()}`;
-  await db.insert(municipalities).values({ id, name: input.name, state: input.state.toUpperCase(), population: input.population ?? null });
-  return (await db.select().from(municipalities).where(eq(municipalities.id, id)).limit(1))[0];
+  const integrationToken = generateMunicipalIntegrationToken();
+  await db.insert(municipalities).values({ id, name: input.name, state: input.state.toUpperCase(), population: input.population ?? null, integrationTokenHash: hashMunicipalIntegrationToken(integrationToken), integrationTokenHint: integrationToken.slice(-8), integrationTokenCreatedAt: new Date() });
+  const municipality = (await db.select().from(municipalities).where(eq(municipalities.id, id)).limit(1))[0];
+  return { ...municipality, integrationToken };
+}
+
+export async function regenerateMunicipalIntegrationToken(municipalityId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  const integrationToken = generateMunicipalIntegrationToken();
+  const createdAt = new Date();
+  await db.update(municipalities).set({ integrationTokenHash: hashMunicipalIntegrationToken(integrationToken), integrationTokenHint: integrationToken.slice(-8), integrationTokenCreatedAt: createdAt, updatedAt: createdAt }).where(eq(municipalities.id, municipalityId));
+  return { integrationToken, tokenHint: integrationToken.slice(-8), createdAt };
 }
 
 export async function createProject(input: typeof projects.$inferInsert) {

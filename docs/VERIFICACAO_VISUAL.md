@@ -23,3 +23,7 @@ Foram verificadas as rotas `/`, `/transparencia` e `/admin` nas resoluções de 
 Após o reforço de segurança, a rota principal autenticada foi verificada em desktop e mobile com a conta de superusuário sem prefeitura cadastrada. A tela apresentou claramente o estado **“Nenhuma prefeitura vinculada”**, sem carregar cards, indicadores ou registros municipais. A rota administrativa também foi verificada em mobile, mantendo o fluxo de cadastro inicial legível e sem corte horizontal.
 
 > Resultado da revisão: a experiência autenticada informa a ausência de vínculo sem expor dados de nenhuma prefeitura. A consulta de dados só será carregada quando existir uma prefeitura autorizada no contexto da sessão.
+
+## Administração de acessos e integração
+
+A rota `/admin/prefeituras` foi verificada em desktop e em 375×812. A tela de cadastro de prefeitura, usuários autorizados por e-mail e token de integração preserva a hierarquia visual, o botão de criação e o estado sem prefeitura sem corte horizontal em dispositivos móveis.
