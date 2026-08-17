@@ -1,0 +1,196 @@
+      "status": "accepted"
+  }
+
+
+
+
+6. Regras de segurança e operação
+A API deve ser tratada como uma superfície de ingestão externa. O token deve ser
+específico por ambiente e, idealmente, específico por prefeitura ou origem. A próxima
+versão deve substituir o mapa em memória usado no protótipo por banco persistente,
+aplicar limite de requisições, registrar IP e user-agent quando permitido, calcular checksum
+do corpo e definir política de retenção para cargas brutas.
+O payload recebido não deve ser executado como código. Campos livres devem ser
+armazenados como dados JSON, com limites de tamanho e profundidade. O servidor deve
+rejeitar cargas acima do tamanho operacional estabelecido, validar datas e impedir que
+ tenantId enviado pelo remetente permita acesso a outra prefeitura sem autorização
+previamente cadastrada.
+A validação do token confirma a origem técnica, mas não substitui a autorização comercial
+da Betha. O fluxo real depende de a Betha aceitar o domínio, método, headers, formato e
+processo de envio do Painel Municipal.
+ Controle                       Estado no protótipo             Requisito para produção
+ Token de ingestão              Implementado por header         Segredo por ambiente, rotação
+                                                                e escopo por origem
+ Idempotência                   Implementada em memória         Índice único no banco e
+                                                                retenção de chaves
+ Validação de envelope          Implementada com Zod            Schemas específicos por
+                                                                recurso após Swagger oficial
+ Armazenamento bruto            Mapa em memória                 Banco ou storage durável,
+                                                                criptografia e retenção
+ Isolamento municipal           tenantId no envelope            Autorização server-side e
+                                                                membership por usuário
+ Auditoria                      Recibo básico                   Histórico de usuário, origem, IP,
+                                                                execução e erros
+ Limite de carga                Limite de registros no schema   Rate limit, quota por tenant e
+                                                                proteção contra abuso
+7. Dashboard web e experiência do usuário
+A interface web deve usar um shell administrativo persistente. No desktop, a sidebar deve
+conter a marca, descrição curta do sistema, navegação principal e um cartão de ambiente.
+No mobile web, a navegação deve se transformar em uma barra ou menu compacto sem
+esconder o conteúdo principal.
+A paleta visual já definida usa azul petróleo e verde-água como sinais de operação e
+sucesso, azul vivo para ações primárias, laranja para atenção e superfícies claras para
+leitura de indicadores. A hierarquia deve privilegiar números grandes, títulos curtos,
+unidade de medida explícita, período de referência e estado de atualização.
+Os dashboards não devem apresentar números demonstrativos como se fossem produção.
+Quando a API não tiver dados para um período, o componente deve exibir estado vazio ou
+desconhecido. Cada indicador deve carregar metadados mínimos: origem, última
+atualização, período, qualidade e status de processamento.
+7.1 Páginas web obrigatórias
+ Rota sugerida                 Página                        Conteúdo
+                                                             Indicadores executivos,
+ /                             Visão geral                   tendências, qualidade e
+                                                             atividades
+ /cadastral                    Cadastral                     Contribuintes, imóveis,
+                                                             econômicos e distribuição
+ /receitas                     Receitas                      Previsto versus realizado,
+                                                             evolução e composição
+ /divida                       Dívida ativa                  Saldo, recuperação, atraso e
+                                                             faixas de risco
+ /explorar                     Explorar                      Busca, filtros, tabela e detalhe
+                                                             de registros
+ /importacoes                  Importações                   Upload, validação, prévia e
+                                                             histórico de cargas
+ /recebimentos                 Recebimentos                  Recibos, status, erros, origem e
+                                                             execução
+ /prefeituras                  Prefeituras                   Contexto municipal ativo e
+                                                             permissões
+ /integracoes                  Integrações                   API receptora, Swagger, Betha
+                                                             e pendências
+ /configuracoes                Configurações                    Tema, perfil, ambiente e
+                                                                preferências
+
+
+
+8. Importação JSON/CSV
+O protótipo permitiu selecionar arquivos JSON e CSV e validar a extensão. No novo projeto
+web, a importação deve evoluir para um fluxo de quatro passos: seleção do arquivo, leitura
+e prévia, validação de colunas e confirmação da carga.
+A tela deve mostrar o nome, tamanho, tipo, quantidade de linhas, colunas reconhecidas,
+linhas inválidas, campos obrigatórios ausentes e ação de confirmação. A importação não
+deve gravar diretamente no banco sem criar um ingestion_batch e um recibo de
+processamento.
+  Plain Text
+  Arquivo selecionado
+    -> leitura segura no navegador
+    -> prévia limitada
+    -> validação de schema por resource
+    -> criação de lote
+    -> processamento assíncrono
+    -> recibo, erros e métricas
+
+
+
+
+9. Testes e critérios de aceite
+A base anterior passou por checagem TypeScript, testes Vitest e lint. Foram validados
+dados municipais demonstrativos, filtragem do explorador e o contrato receptor para
+envelope válido, payload inválido e metadados opcionais. O teste de autenticação herdado
+do template permaneceu ignorado porque depende de infraestrutura de sessão do
+template.
+Para o novo projeto, os critérios mínimos são os seguintes:
+ Categoria                                     Critério de aceite
+ Frontend                                      Todas as rotas principais carregam sem erro e
+                                               sem handlers vazios
+ Responsividade                                Sidebar funciona no desktop e navegação
+                                               compacta funciona em viewport móvel
+ Multi-tenancy                                Troca de prefeitura altera o contexto sem
+                                              misturar indicadores
+ Recepção                                     Carga válida retorna 202 e recibo
+                                              identificável
+ Idempotência                                 Repetição da mesma chave não duplica o lote
+ Segurança                                    Token ausente ou inválido retorna 401
+ Validação                                    Envelope incompleto retorna 422 com
+                                              detalhes
+ Persistência                                 Recibos sobrevivem à reinicialização do
+                                              servidor
+ Swagger                                       /api/v1/docs carrega a especificação da
+                                              mesma API executada
+ Operação                                     Erros e cargas ficam consultáveis pelo painel
+                                              web
+
+
+
+10. Variáveis de ambiente
+A nova aplicação deve manter as variáveis fora do código-fonte. Os nomes abaixo são uma
+proposta inicial; os valores reais devem ser configurados apenas no ambiente seguro do
+projeto.
+  Plain Text
+  NODE_ENV=development
+  PORT=3000
+  DATABASE_URL=<conexao_do_banco>
+  RECEIVER_INGESTION_TOKEN=<token_do_remetente>
+  PUBLIC_API_BASE_URL=https://seu-dominio.example.com
+
+
+Não solicitar nem armazenar credenciais Betha antes da validação comercial. Quando o
+setor comercial fornecer o método de autenticação, o endpoint oficial, o Swagger e os
+requisitos de user-access , registrar essas informações em documentação versionada e criar
+secrets específicos para produção.
+
+11. Plano de criação do novo projeto
+A criação deve começar por uma pasta nova, sem copiar automaticamente a pasta Expo. A
+primeira tarefa deve criar o shell web e o contrato OpenAPI; a segunda deve criar a
+persistência e o serviço de ingestão; a terceira deve migrar os dashboards; a quarta deve
+conectar a tela de recebimentos; e a quinta deve configurar autenticação e operação.
+ Ordem                         Nova tarefa                   Resultado esperado
+ 1                             Bootstrap web-first           React/Vite, TypeScript, layout
+                                                             responsivo e tema
+ 2                             Contrato receptor             OpenAPI, schemas Zod e
+                                                             endpoints versionados
+ 3                             Persistência                  Tabelas, índices, migrations e
+                                                             repository
+ 4                             Ingestão                      Token, tenant, idempotência,
+                                                             lote e erros
+ 5                             Dashboard                     Indicadores alimentados por
+                                                             queries reais
+ 6                             Recebimentos                  Histórico operacional com
+                                                             filtros
+ 7                             Betha                         Adaptador específico somente
+                                                             após Swagger oficial
+ 8                             Produção                      Domínio, secrets,
+                                                             observabilidade e backup
+
+
+11.1 Definição de pronto
+Uma tarefa só deve ser considerada pronta quando possuir implementação, teste
+automatizado correspondente, estado de erro e documentação mínima. Nenhum
+componente deve exibir mock como dado oficial. Toda integração externa deve possuir
+contrato, autenticação, timeout, tratamento de erro e estratégia de reprocessamento.
+
+12. Pendências explícitas
+As principais pendências não são bugs da interface; são dependências de integração e
+produção. Ainda é necessário obter o Swagger oficial da Betha, confirmar se a Betha
+enviará dados para um endpoint externo do município, confirmar o formato de
+autenticação, definir o user-access , validar o domínio receptor e estabelecer a política
+comercial de habilitação.
+Também devem ser concluídos o banco persistente dos recebimentos, a autenticação dos
+usuários do painel, as permissões por prefeitura, o histórico de auditoria, o processamento
+assíncrono e a observabilidade operacional.
+  Regra de não invenção: até que a Betha forneça o contrato oficial, o sistema deve
+  documentar apenas o envelope receptor próprio e manter records como objeto aberto.
+  Não criar campos específicos de tributos, contribuintes, imóveis ou débitos com base em
+  suposição.
+
+13. Referências técnicas
+[1] React — documentação oficial
+[2] Vite — guia oficial
+[3] Express — documentação oficial
+[4] OpenAPI Initiative — especificação e governança
+[5] Zod — validação de schemas TypeScript
+[6] MDN — Web Storage e localStorage
+Este documento é uma especificação de transição baseada no estado implementado no
+projeto anterior. A arquitetura recomendada para o novo projeto pode ser refinada após a
+definição do provedor de hospedagem, banco de dados, autenticação e contrato oficial da
+Betha.
+

@@ -1,0 +1,29 @@
+# Project TODO
+
+- [x] Analisar a documentação técnica de transição anexada e registrar os requisitos aplicáveis ao sistema.
+- [x] Modelar as entidades de projetos, indicadores, medições, contratos, licitações, despesas e serviços municipais.
+- [x] Criar e aplicar a migração do banco de dados para os módulos municipais e seus relacionamentos.
+- [x] Implementar contexto ativo de prefeitura com seleção, persistência e propagação nas consultas públicas e administrativas.
+- [x] Fazer os perfis municipais controlarem de fato a autorização por prefeitura, sem depender apenas do papel global.
+- [x] Adicionar remoção de vínculos municipais no painel administrativo.
+- [x] Implementar procedimentos públicos para consulta de indicadores, transparência e catálogo de serviços.
+- [x] Implementar procedimentos administrativos protegidos para criar, editar e acompanhar dados municipais.
+- [x] Restringir todas as mutações administrativas ao perfil municipal admin, mantendo os demais perfis sem alteração de dados.
+- [x] Implementar recebimentos persistentes a partir de envelope validado, para que o histórico operacional possa ser consultado.
+- [x] Documentar que o conector Betha depende de contrato, Swagger e autorização comercial externos.
+- [x] Construir a área pública sem login, com painel de transparência, indicadores e catálogo de serviços.
+- [x] Desenvolver o dashboard público com cards de população, receitas, despesas e projetos em andamento, além de gráficos.
+- [x] Desenvolver filtros públicos de transparência por período, tipo de registro e categoria.
+- [x] Adicionar estados de erro explícitos e opção de tentar novamente nas consultas das páginas públicas.
+- [x] Exibir e permitir nova tentativa quando a consulta de prefeituras falhar no contexto público.
+- [x] Construir o módulo administrativo de metas e projetos com os status planejado, em andamento, concluído e cancelado.
+- [x] Implementar no painel administrativo de indicadores o histórico de medições, gráfico de evolução e identificação da secretaria ou área responsável.
+- [x] Exibir no módulo administrativo de indicadores o histórico de medições com data, valor, fonte e qualidade.
+- [x] Adicionar estado de erro explícito no módulo administrativo de indicadores para falhas nas consultas ou atualizações.
+- [x] Construir os módulos administrativos de contratos, licitações, despesas e serviços municipais.
+- [x] Disponibilizar edição de indicadores, registros de transparência e serviços no painel administrativo.
+- [x] Aplicar DashboardLayout com sidebar, navegação responsiva e estados de carregamento no painel administrativo.
+- [x] Criar uma linguagem visual elegante e refinada, com tipografia, espaçamentos, cards, tabelas e gráficos consistentes.
+- [x] Adicionar testes do procedimento de recebimentos para criação, duplicidade por chave idempotente e consulta posterior do histórico.
+- [x] Validar o painel administrativo em viewport mobile e registrar a verificação visual completa das rotas principais.
+- [ ] Criar um checkpoint final do projeto com todos os itens concluídos.

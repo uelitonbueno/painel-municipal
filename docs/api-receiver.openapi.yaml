@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Painel Municipal — API Receptora
+  version: 0.1.0
+  description: Contrato próprio e preliminar para cargas autorizadas. Não representa uma integração oficial de fornecedor externo.
+paths:
+  /api/v1/recebimentos/betha:
+    post:
+      summary: Recebe um envelope genérico autorizado
+      parameters:
+        - in: header
+          name: x-receiver-token
+          required: true
+          schema: { type: string }
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: { type: string }
+      responses:
+        '202': { description: Carga aceita }
+        '200': { description: Chave de idempotência já processada }
+        '401': { description: Token ausente ou inválido }
+        '422': { description: Envelope inválido }
