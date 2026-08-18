@@ -74,3 +74,7 @@
 - [x] Criar testes de filtragem real dos dados de parcelamentos, fiscalização e contribuintes por ano, situação e perfil.
 - [x] Validar desktop e mobile e salvar checkpoint da Fase 2 do BI Tributário.
 - [x] Produzir documentação completa do Painel Municipal: criação, arquitetura, segurança, menus, painéis, integrações e operação.
+- [x] Atualizar a aparência do Painel Municipal com base no projeto de referência Nexus Tributos, preservando recursos, segurança e responsividade.
+- [x] Estender o novo sistema visual à área de consulta autenticada, preservando a clareza de transparência e serviços.
+- [x] Validar em mobile as telas administrativas gerais e a área de consulta após a atualização visual.
+- [x] Validar o contraste e a legibilidade de Serviços, Indicadores e Transparência em desktop e mobile após o novo tema.
