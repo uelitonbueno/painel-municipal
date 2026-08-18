@@ -73,3 +73,4 @@
 - [x] Criar testes de autorização e isolamento por prefeitura das consultas de parcelamentos, fiscalização e contribuintes.
 - [x] Criar testes de filtragem real dos dados de parcelamentos, fiscalização e contribuintes por ano, situação e perfil.
 - [x] Validar desktop e mobile e salvar checkpoint da Fase 2 do BI Tributário.
+- [x] Produzir documentação completa do Painel Municipal: criação, arquitetura, segurança, menus, painéis, integrações e operação.
