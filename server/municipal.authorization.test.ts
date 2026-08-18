@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   listMunicipalitiesForUser: vi.fn(),
   getPublicDashboard: vi.fn(),
   getTaxAnalytics: vi.fn(),
+  getInstallmentAnalytics: vi.fn(),
+  getInspectionAnalytics: vi.fn(),
+  getTaxPayerAnalytics: vi.fn(),
   authorizeMunicipalUser: vi.fn(),
   createMunicipality: vi.fn(),
   assignOwnerMembership: vi.fn(),
@@ -61,6 +64,17 @@ describe("municipal.public security", () => {
     expect(mocks.getTaxAnalytics).not.toHaveBeenCalled();
   });
 
+  it("bloqueia os três painéis tributários da Fase 2 fora da prefeitura vinculada", async () => {
+    mocks.getMembership.mockResolvedValue(undefined);
+    const caller = municipalRouter.createCaller(context());
+    await expect(caller.admin.installmentAnalytics({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.admin.inspectionAnalytics({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.admin.taxpayerAnalytics({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.getInstallmentAnalytics).not.toHaveBeenCalled();
+    expect(mocks.getInspectionAnalytics).not.toHaveBeenCalled();
+    expect(mocks.getTaxPayerAnalytics).not.toHaveBeenCalled();
+  });
+
   it("mostra somente as prefeituras vinculadas ao usuário e permite visão transversal ao superusuário", async () => {
     mocks.listMunicipalitiesForUser.mockResolvedValue([{ id: "mun-001", name: "Prefeitura A" }]);
     mocks.getPublicDashboard.mockResolvedValue({ municipality: { id: "mun-002" }, stats: null, revenueSeries: [], updatedAt: null });
@@ -100,6 +114,22 @@ describe("municipal.admin authorization", () => {
     await expect(caller.admin.projects({ tenantId: "mun-001" })).resolves.toEqual([]);
     await expect(caller.admin.createProject({ tenantId: "mun-001", title: "Praça central", area: "Infraestrutura", status: "planejado", progress: 0, public: true })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.createProject).not.toHaveBeenCalled();
+  });
+
+  it("repassa filtros de ano, situação e perfil às consultas da Fase 2 somente após validar o vínculo", async () => {
+    mocks.getMembership.mockResolvedValue({ role: "editor" });
+    mocks.getInstallmentAnalytics.mockResolvedValue({ analytics: {}, availableYears: [2026] });
+    mocks.getInspectionAnalytics.mockResolvedValue({ analytics: {}, availableYears: [2026] });
+    mocks.getTaxPayerAnalytics.mockResolvedValue({ analytics: {}, availableYears: [2026] });
+    const caller = municipalRouter.createCaller(context());
+
+    await caller.admin.installmentAnalytics({ tenantId: "mun-001", fiscalYear: 2026, status: "ativo" });
+    await caller.admin.inspectionAnalytics({ tenantId: "mun-001", fiscalYear: 2026, status: "concluida" });
+    await caller.admin.taxpayerAnalytics({ tenantId: "mun-001", fiscalYear: 2026, taxpayerType: "PJ", status: "ativo" });
+
+    expect(mocks.getInstallmentAnalytics).toHaveBeenCalledWith({ tenantId: "mun-001", fiscalYear: 2026, status: "ativo" });
+    expect(mocks.getInspectionAnalytics).toHaveBeenCalledWith({ tenantId: "mun-001", fiscalYear: 2026, status: "concluida" });
+    expect(mocks.getTaxPayerAnalytics).toHaveBeenCalledWith({ tenantId: "mun-001", fiscalYear: 2026, taxpayerType: "PJ", status: "ativo" });
   });
 
   it("permite mutação para o administrador vinculado", async () => {

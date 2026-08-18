@@ -211,6 +211,93 @@ export const taxLedgerEntries = mysqlTable(
   ],
 );
 
+export const taxInstallmentPlans = mysqlTable(
+  "tax_installment_plans",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    tenantId: varchar("tenantId", { length: 64 }).notNull(),
+    externalId: varchar("externalId", { length: 140 }).notNull(),
+    taxpayerName: varchar("taxpayerName", { length: 180 }),
+    taxpayerDocument: varchar("taxpayerDocument", { length: 32 }),
+    taxpayerType: mysqlEnum("taxpayerType", ["PF", "PJ", "NA"]).default("NA").notNull(),
+    taxType: mysqlEnum("taxType", ["IPTU", "ISS", "ITBI", "TAXA", "CONTRIBUICAO", "MULTA", "OUTROS"]),
+    fiscalYear: int("fiscalYear"),
+    status: mysqlEnum("status", ["ativo", "quitado", "cancelado", "inadimplente"]).default("ativo").notNull(),
+    agreementDate: date("agreementDate", { mode: "string" }),
+    installmentsTotal: int("installmentsTotal").default(0).notNull(),
+    installmentsPaid: int("installmentsPaid").default(0).notNull(),
+    installmentsOverdue: int("installmentsOverdue").default(0).notNull(),
+    originalAmount: decimal("originalAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    negotiatedAmount: decimal("negotiatedAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    recoveredAmount: decimal("recoveredAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    outstandingAmount: decimal("outstandingAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    sourceUpdatedAt: timestamp("sourceUpdatedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("installment_tenant_external_unique").on(table.tenantId, table.externalId),
+    index("installment_tenant_status_idx").on(table.tenantId, table.status),
+    index("installment_tenant_period_idx").on(table.tenantId, table.fiscalYear),
+  ],
+);
+
+export const taxInspections = mysqlTable(
+  "tax_inspections",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    tenantId: varchar("tenantId", { length: 64 }).notNull(),
+    externalId: varchar("externalId", { length: 140 }).notNull(),
+    taxpayerName: varchar("taxpayerName", { length: 180 }),
+    taxpayerDocument: varchar("taxpayerDocument", { length: 32 }),
+    companyReference: varchar("companyReference", { length: 100 }),
+    cnae: varchar("cnae", { length: 20 }),
+    fiscalName: varchar("fiscalName", { length: 180 }),
+    fiscalYear: int("fiscalYear").notNull(),
+    referenceMonth: int("referenceMonth"),
+    status: mysqlEnum("status", ["aberta", "concluida", "cancelada"]).default("aberta").notNull(),
+    startedAt: date("startedAt", { mode: "string" }),
+    completedAt: date("completedAt", { mode: "string" }),
+    notifications: int("notifications").default(0).notNull(),
+    infractionNotices: int("infractionNotices").default(0).notNull(),
+    assessedAmount: decimal("assessedAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    collectedAmount: decimal("collectedAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    fineAmount: decimal("fineAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    sourceUpdatedAt: timestamp("sourceUpdatedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("inspection_tenant_external_unique").on(table.tenantId, table.externalId),
+    index("inspection_tenant_status_idx").on(table.tenantId, table.status),
+    index("inspection_tenant_period_idx").on(table.tenantId, table.fiscalYear, table.referenceMonth),
+  ],
+);
+
+export const taxPayers = mysqlTable(
+  "tax_payers",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    tenantId: varchar("tenantId", { length: 64 }).notNull(),
+    externalId: varchar("externalId", { length: 140 }).notNull(),
+    name: varchar("name", { length: 180 }).notNull(),
+    document: varchar("document", { length: 32 }),
+    type: mysqlEnum("type", ["PF", "PJ", "NA"]).default("NA").notNull(),
+    status: mysqlEnum("status", ["ativo", "inativo", "suspenso", "baixado"]).default("ativo").notNull(),
+    economicActivity: varchar("economicActivity", { length: 180 }),
+    cnae: varchar("cnae", { length: 20 }),
+    propertiesCount: int("propertiesCount").default(0).notNull(),
+    companiesCount: int("companiesCount").default(0).notNull(),
+    sourceUpdatedAt: timestamp("sourceUpdatedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("taxpayer_tenant_external_unique").on(table.tenantId, table.externalId),
+    index("taxpayer_tenant_type_status_idx").on(table.tenantId, table.type, table.status),
+  ],
+);
+
 export const ingestionReceipts = mysqlTable(
   "ingestion_receipts",
   {

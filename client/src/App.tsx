@@ -25,6 +25,9 @@ function Router() {
     <Route path="/admin/tributos/itbi" component={AdminPages} />
     <Route path="/admin/tributos/inadimplencia" component={AdminPages} />
     <Route path="/admin/tributos/divida-ativa" component={AdminPages} />
+    <Route path="/admin/tributos/parcelamentos" component={AdminPages} />
+    <Route path="/admin/tributos/fiscalizacao" component={AdminPages} />
+    <Route path="/admin/tributos/contribuintes" component={AdminPages} />
     <Route path="/admin/:rest*?" component={AdminPages} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />

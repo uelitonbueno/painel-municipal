@@ -72,3 +72,42 @@ Para alimentar a Fase 1 do BI Tributário, envie o mesmo envelope para `POST /ap
   "metadata": { "schemaVersion": "1.0" }
 }
 ```
+
+## Recursos tributários — Fase 2
+
+Os recursos abaixo usam o mesmo envelope de `POST /api/v1/ingest`, o mesmo `integrationToken` e a mesma regra de idempotência por prefeitura. Cada registro precisa conter `externalId` estável para atualização segura da informação originada no sistema tributário.
+
+| Recurso | Finalidade | Campos mínimos por registro |
+|---|---|---|
+| `tributos.parcelamentos` | Acordos, parcelas e recuperação de débitos | `externalId`, `status`, `installmentsTotal`, `outstandingAmount` |
+| `tributos.fiscalizacoes` | Procedimentos, autos e produtividade fiscal | `externalId`, `fiscalYear`, `status` |
+| `tributos.contribuintes` | Base ativa de pessoas físicas e jurídicas | `externalId`, `name`, `status` |
+
+### Exemplo: parcelamentos
+
+```json
+{
+  "integrationToken": "pm_token_gerado_no_painel",
+  "source": "exportador-tributario",
+  "resource": "tributos.parcelamentos",
+  "operation": "incremental",
+  "idempotencyKey": "parcelamentos-2026-08-lote-001",
+  "sentAt": "2026-08-18T15:00:00.000Z",
+  "records": [{
+    "externalId": "acordo-0001",
+    "taxpayerName": "Contribuinte Exemplo",
+    "taxpayerType": "PJ",
+    "taxType": "ISS",
+    "fiscalYear": 2026,
+    "status": "ativo",
+    "installmentsTotal": 12,
+    "installmentsPaid": 4,
+    "installmentsOverdue": 1,
+    "negotiatedAmount": 12000,
+    "recoveredAmount": 4000,
+    "outstandingAmount": 8000
+  }]
+}
+```
+
+Para `tributos.fiscalizacoes`, use adicionalmente `fiscalName`, `notifications`, `infractionNotices`, `assessedAmount`, `collectedAmount` e `fineAmount` quando disponíveis. Para `tributos.contribuintes`, informe `document`, `type`, `economicActivity`, `cnae`, `propertiesCount` e `companiesCount` quando a origem possuir essas informações.

@@ -4,6 +4,9 @@ const mocks = vi.hoisted(() => ({
   getMunicipalityByIntegrationToken: vi.fn(),
   recordIngestion: vi.fn(),
   upsertTaxLedgerEntries: vi.fn(),
+  upsertTaxInstallmentPlans: vi.fn(),
+  upsertTaxInspections: vi.fn(),
+  upsertTaxPayers: vi.fn(),
   completeIngestion: vi.fn(),
 }));
 
@@ -45,5 +48,18 @@ describe("receptor JSON municipal", () => {
     expect(result).toMatchObject({ status: 202, body: { municipalityId: "mun-curitiba", processedRecords: 1 } });
     expect(mocks.upsertTaxLedgerEntries).toHaveBeenCalledWith("mun-curitiba", [expect.objectContaining({ externalId: "iptu-001", taxType: "IPTU" })]);
     expect(mocks.completeIngestion).toHaveBeenCalledWith("rec-tax");
+  });
+
+  it.each([
+    ["tributos.parcelamentos", { externalId: "parc-001", status: "ativo", installmentsTotal: 12, outstandingAmount: 450 }, "upsertTaxInstallmentPlans"],
+    ["tributos.fiscalizacoes", { externalId: "fisc-001", fiscalYear: 2026, status: "aberta", notifications: 1 }, "upsertTaxInspections"],
+    ["tributos.contribuintes", { externalId: "cont-001", name: "Empresa Municipal", type: "PJ", status: "ativo" }, "upsertTaxPayers"],
+  ])("roteia o recurso %s para a persistência municipal correta", async (resource, record, upsertMethod) => {
+    mocks.getMunicipalityByIntegrationToken.mockResolvedValue({ id: "mun-curitiba" });
+    mocks.recordIngestion.mockResolvedValue({ receipt: { id: "rec-phase2" }, duplicate: false });
+    mocks[upsertMethod as "upsertTaxInstallmentPlans" | "upsertTaxInspections" | "upsertTaxPayers"].mockResolvedValue({ processed: 1 });
+    const result = await processMunicipalIngestion({ ...validEnvelope, resource, idempotencyKey: `${resource}-2026-lote-001`, records: [record] });
+    expect(result).toMatchObject({ status: 202, body: { municipalityId: "mun-curitiba", processedRecords: 1 } });
+    expect(mocks[upsertMethod as "upsertTaxInstallmentPlans" | "upsertTaxInspections" | "upsertTaxPayers"]).toHaveBeenCalledWith("mun-curitiba", [expect.objectContaining({ externalId: record.externalId })]);
   });
 });

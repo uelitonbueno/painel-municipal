@@ -61,3 +61,15 @@
 - [x] Salvar checkpoint da Fase 1 do BI Tributário após a validação responsiva.
 - [x] Registrar as rotas tributárias específicas no roteador principal para impedir páginas 404.
 - [x] Garantir que a navegação lateral permita acessar todos os painéis tributários em telas de menor altura.
+- [x] Modelar dados por prefeitura para parcelamentos, fiscalizações e consolidado de contribuintes.
+- [x] Estender o contrato de recebimento tributário para os recursos de parcelamentos, fiscalização e contribuintes.
+- [x] Implementar procedimentos protegidos e métricas para parcelamentos, fiscalização e contribuintes.
+- [x] Construir o painel de Parcelamentos com estoque, acordos ativos, recuperação e inadimplência de parcelas.
+- [x] Construir o painel de Fiscalização com produtividade, autos, créditos constituídos e taxa de conversão.
+- [x] Construir o painel de Contribuintes com segmentação por perfil, concentração de arrecadação e indicadores de base ativa.
+- [x] Integrar os novos painéis à navegação tributária, filtros e isolamento por prefeitura.
+- [x] Documentar os payloads de integração da Fase 2 e criar testes de métricas, filtros, autorização e token.
+- [x] Criar testes dos filtros da Fase 2 para parcelamentos, fiscalização e contribuintes por ano, situação e perfil.
+- [x] Criar testes de autorização e isolamento por prefeitura das consultas de parcelamentos, fiscalização e contribuintes.
+- [x] Criar testes de filtragem real dos dados de parcelamentos, fiscalização e contribuintes por ano, situação e perfil.
+- [x] Validar desktop e mobile e salvar checkpoint da Fase 2 do BI Tributário.
