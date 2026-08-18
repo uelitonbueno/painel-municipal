@@ -1,0 +1,40 @@
+CREATE TABLE `tax_ledger_entries` (
+	`id` varchar(64) NOT NULL,
+	`tenantId` varchar(64) NOT NULL,
+	`externalId` varchar(140) NOT NULL,
+	`fiscalYear` int NOT NULL,
+	`referenceMonth` int NOT NULL,
+	`taxType` enum('IPTU','ISS','ITBI','TAXA','CONTRIBUICAO','MULTA','OUTROS') NOT NULL,
+	`taxCategory` varchar(120),
+	`taxpayerName` varchar(180),
+	`taxpayerDocument` varchar(32),
+	`taxpayerType` enum('PF','PJ','NA') NOT NULL DEFAULT 'NA',
+	`neighborhood` varchar(120),
+	`propertyReference` varchar(100),
+	`propertyType` varchar(80),
+	`companyReference` varchar(100),
+	`cnae` varchar(20),
+	`status` enum('lancado','pago','cancelado','isento','em_aberto','divida_ativa') NOT NULL DEFAULT 'lancado',
+	`assessedAmount` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`collectedAmount` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`cancelledAmount` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`exemptAmount` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`outstandingAmount` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`propertyTransactionValue` decimal(18,2),
+	`activeDebtOriginal` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`activeDebtCorrection` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`activeDebtInterest` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`activeDebtPenalty` decimal(18,2) NOT NULL DEFAULT '0.00',
+	`activeDebtStatus` enum('nao_inscrita','inscrita','ajuizada','parcelada','cancelada','prescrita') NOT NULL DEFAULT 'nao_inscrita',
+	`dueDate` date,
+	`paidDate` date,
+	`sourceUpdatedAt` timestamp,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `tax_ledger_entries_id` PRIMARY KEY(`id`),
+	CONSTRAINT `tax_entry_tenant_external_unique` UNIQUE(`tenantId`,`externalId`)
+);
+--> statement-breakpoint
+CREATE INDEX `tax_entry_tenant_period_idx` ON `tax_ledger_entries` (`tenantId`,`fiscalYear`,`referenceMonth`);--> statement-breakpoint
+CREATE INDEX `tax_entry_tenant_tax_idx` ON `tax_ledger_entries` (`tenantId`,`taxType`,`status`);--> statement-breakpoint
+CREATE INDEX `tax_entry_tenant_neighborhood_idx` ON `tax_ledger_entries` (`tenantId`,`neighborhood`);

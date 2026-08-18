@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getMunicipalityByIntegrationToken: vi.fn(),
   recordIngestion: vi.fn(),
+  upsertTaxLedgerEntries: vi.fn(),
+  completeIngestion: vi.fn(),
 }));
 
 vi.mock("./db", () => mocks);
@@ -31,7 +33,17 @@ describe("receptor JSON municipal", () => {
     mocks.getMunicipalityByIntegrationToken.mockResolvedValue({ id: "mun-curitiba" });
     mocks.recordIngestion.mockResolvedValue({ receipt: { id: "rec-001" }, duplicate: false });
     const result = await processMunicipalIngestion(validEnvelope);
-    expect(result).toEqual({ status: 202, body: { receiptId: "rec-001", municipalityId: "mun-curitiba", duplicate: false } });
+    expect(result).toEqual({ status: 202, body: { receiptId: "rec-001", municipalityId: "mun-curitiba", duplicate: false, processedRecords: 0 } });
     expect(mocks.recordIngestion).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "mun-curitiba", idempotencyKey: validEnvelope.idempotencyKey }));
+  });
+
+  it("persiste o recurso tributário no livro fiscal da prefeitura identificada pelo token", async () => {
+    mocks.getMunicipalityByIntegrationToken.mockResolvedValue({ id: "mun-curitiba" });
+    mocks.recordIngestion.mockResolvedValue({ receipt: { id: "rec-tax" }, duplicate: false });
+    mocks.upsertTaxLedgerEntries.mockResolvedValue({ processed: 1 });
+    const result = await processMunicipalIngestion({ ...validEnvelope, resource: "tributos.lancamentos", records: [{ externalId: "iptu-001", fiscalYear: 2026, referenceMonth: 1, taxType: "IPTU", assessedAmount: 1000, collectedAmount: 800, outstandingAmount: 200 }] });
+    expect(result).toMatchObject({ status: 202, body: { municipalityId: "mun-curitiba", processedRecords: 1 } });
+    expect(mocks.upsertTaxLedgerEntries).toHaveBeenCalledWith("mun-curitiba", [expect.objectContaining({ externalId: "iptu-001", taxType: "IPTU" })]);
+    expect(mocks.completeIngestion).toHaveBeenCalledWith("rec-tax");
   });
 });

@@ -49,3 +49,15 @@
 - [x] Associar automaticamente o login ao usuário pré-cadastrado quando o e-mail for correspondente.
 - [x] Exibir e gerenciar os usuários autorizados no painel da prefeitura.
 - [x] Criar teste do fluxo de autenticação ativando o vínculo pré-autorizado e bloqueando e-mail não cadastrado.
+- [x] Modelar dados tributários por prefeitura para lançamentos, arrecadações, inadimplência e dívida ativa.
+- [x] Documentar explicitamente o payload de integração `tributos.lancamentos`, incluindo campos obrigatórios, opcionais e exemplos válidos por token municipal.
+- [x] Implementar procedimentos protegidos de consulta do BI Tributário com filtros de ano, mês, tributo, bairro e situação.
+- [x] Construir o Dashboard Geral de Tributos com indicadores financeiros e gráficos de evolução.
+- [x] Construir o Painel de Arrecadação com filtros e comparativos por tributo.
+- [x] Construir os painéis de IPTU, ISS e ITBI com indicadores e análises segmentadas.
+- [x] Construir os painéis de Inadimplência e Dívida Ativa com estoque, faixas e evolução.
+- [x] Integrar a navegação tributária ao painel autenticado e preservando o isolamento por prefeitura.
+- [x] Criar testes das métricas, filtros por ano, mês, tributo, bairro e situação, autorização e recebimento tributário por token.
+- [x] Salvar checkpoint da Fase 1 do BI Tributário após a validação responsiva.
+- [x] Registrar as rotas tributárias específicas no roteador principal para impedir páginas 404.
+- [x] Garantir que a navegação lateral permita acessar todos os painéis tributários em telas de menor altura.

@@ -66,6 +66,9 @@ export const receiptForm = z.object({ tenantId: z.string().min(1), source: z.enu
 const membershipForm = z.object({ tenantId: z.string().min(1), email: z.string().email(), role: membershipRoleSchema });
 const membershipRemovalForm = z.object({ tenantId: z.string().min(1), membershipId: z.number().int().positive() });
 const authorizedUserRemovalForm = z.object({ tenantId: z.string().min(1), authorizationId: z.number().int().positive() });
+const taxTypeSchema = z.enum(["IPTU", "ISS", "ITBI", "TAXA", "CONTRIBUICAO", "MULTA", "OUTROS"]);
+const taxStatusSchema = z.enum(["lancado", "pago", "cancelado", "isento", "em_aberto", "divida_ativa"]);
+const taxFiltersForm = tenantInput.extend({ fiscalYear: z.coerce.number().int().min(2000).max(2200).optional(), referenceMonth: z.coerce.number().int().min(1).max(12).optional(), taxType: taxTypeSchema.optional(), neighborhood: z.string().max(120).optional(), taxpayerType: z.enum(["PF", "PJ", "NA"]).optional(), status: taxStatusSchema.optional() });
 
 export const municipalRouter = router({
   public: router({
@@ -74,6 +77,7 @@ export const municipalRouter = router({
     indicators: protectedProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.getPublicIndicators(input.tenantId); }),
     transparency: protectedProcedure.input(tenantInput.extend({ type: transparencyTypeSchema.optional(), category: z.string().optional(), from: z.string().optional(), to: z.string().optional() })).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.listTransparency(input); }),
     services: protectedProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.listServices(input.tenantId); }),
+    taxAnalytics: protectedProcedure.input(taxFiltersForm).query(async ({ ctx, input }) => { await assertTenantReadAccess(ctx.user, input.tenantId); return db.getTaxAnalytics(input); }),
   }),
   admin: router({
     overview: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.getAdminOverview(input.tenantId); }),
@@ -85,6 +89,7 @@ export const municipalRouter = router({
     members: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.listMunicipalityMembers(input.tenantId); }),
     authorizedUsers: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.listMunicipalAuthorizedUsers(input.tenantId); }),
     integrationTokenInfo: adminProcedure.input(tenantInput).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.getMunicipalityIntegrationTokenInfo(input.tenantId); }),
+    taxAnalytics: adminProcedure.input(taxFiltersForm).query(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId); return db.getTaxAnalytics(input); }),
     createMunicipality: platformAdminProcedure.input(municipalityForm).mutation(async ({ ctx, input }) => { const municipality = await db.createMunicipality(input); await db.assignOwnerMembership(ctx.user.id, municipality.id); return municipality; }),
     regenerateIntegrationToken: adminProcedure.input(tenantInput).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); return db.regenerateMunicipalIntegrationToken(input.tenantId); }),
     createProject: adminProcedure.input(projectForm).mutation(async ({ ctx, input }) => { await assertTenantAccess(ctx.user, input.tenantId, "admin"); await db.createProject({ ...input, budget: input.budget?.toFixed(2) ?? null, description: input.description || null, startDate: input.startDate || null, targetDate: input.targetDate || null }); }),

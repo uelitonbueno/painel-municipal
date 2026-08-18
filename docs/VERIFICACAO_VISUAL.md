@@ -27,3 +27,11 @@ Após o reforço de segurança, a rota principal autenticada foi verificada em d
 ## Administração de acessos e integração
 
 A rota `/admin/prefeituras` foi verificada em desktop e em 375×812. A tela de cadastro de prefeitura, usuários autorizados por e-mail e token de integração preserva a hierarquia visual, o botão de criação e o estado sem prefeitura sem corte horizontal em dispositivos móveis.
+
+## BI Tributário — Fase 1
+
+As rotas `/admin/tributos`, `/admin/tributos/arrecadacao` e `/admin/tributos/divida-ativa` foram verificadas em desktop. Os filtros de período e bairro, a identificação da prefeitura ativa e o estado de espera por dados tributários foram renderizados corretamente. A ausência de gráficos e métricas neste momento é intencional: os painéis não utilizam dados fictícios e aguardam cargas reais do recurso `tributos.lancamentos` autenticadas pelo token da prefeitura.
+
+Após o ajuste de densidade da sidebar, os sete módulos tributários permanecem visíveis na navegação desktop, incluindo o atalho ativo de **Dívida Ativa**, sem sobreposição com o rodapé da conta.
+
+Em 375×812, os painéis de **Arrecadação** e **IPTU** preservaram hierarquia, filtros empilhados e o estado de espera por carga fiscal sem corte horizontal. O menu móvel resume a navegação no cabeçalho, mantendo o conteúdo tributário utilizável em telas estreitas.

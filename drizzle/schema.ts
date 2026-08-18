@@ -167,6 +167,50 @@ export const municipalServices = mysqlTable(
   table => [index("services_tenant_category_idx").on(table.tenantId, table.category)],
 );
 
+export const taxLedgerEntries = mysqlTable(
+  "tax_ledger_entries",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    tenantId: varchar("tenantId", { length: 64 }).notNull(),
+    externalId: varchar("externalId", { length: 140 }).notNull(),
+    fiscalYear: int("fiscalYear").notNull(),
+    referenceMonth: int("referenceMonth").notNull(),
+    taxType: mysqlEnum("taxType", ["IPTU", "ISS", "ITBI", "TAXA", "CONTRIBUICAO", "MULTA", "OUTROS"]).notNull(),
+    taxCategory: varchar("taxCategory", { length: 120 }),
+    taxpayerName: varchar("taxpayerName", { length: 180 }),
+    taxpayerDocument: varchar("taxpayerDocument", { length: 32 }),
+    taxpayerType: mysqlEnum("taxpayerType", ["PF", "PJ", "NA"]).default("NA").notNull(),
+    neighborhood: varchar("neighborhood", { length: 120 }),
+    propertyReference: varchar("propertyReference", { length: 100 }),
+    propertyType: varchar("propertyType", { length: 80 }),
+    companyReference: varchar("companyReference", { length: 100 }),
+    cnae: varchar("cnae", { length: 20 }),
+    status: mysqlEnum("status", ["lancado", "pago", "cancelado", "isento", "em_aberto", "divida_ativa"]).default("lancado").notNull(),
+    assessedAmount: decimal("assessedAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    collectedAmount: decimal("collectedAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    cancelledAmount: decimal("cancelledAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    exemptAmount: decimal("exemptAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    outstandingAmount: decimal("outstandingAmount", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    propertyTransactionValue: decimal("propertyTransactionValue", { precision: 18, scale: 2 }),
+    activeDebtOriginal: decimal("activeDebtOriginal", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    activeDebtCorrection: decimal("activeDebtCorrection", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    activeDebtInterest: decimal("activeDebtInterest", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    activeDebtPenalty: decimal("activeDebtPenalty", { precision: 18, scale: 2 }).default("0.00").notNull(),
+    activeDebtStatus: mysqlEnum("activeDebtStatus", ["nao_inscrita", "inscrita", "ajuizada", "parcelada", "cancelada", "prescrita"]).default("nao_inscrita").notNull(),
+    dueDate: date("dueDate", { mode: "string" }),
+    paidDate: date("paidDate", { mode: "string" }),
+    sourceUpdatedAt: timestamp("sourceUpdatedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    uniqueIndex("tax_entry_tenant_external_unique").on(table.tenantId, table.externalId),
+    index("tax_entry_tenant_period_idx").on(table.tenantId, table.fiscalYear, table.referenceMonth),
+    index("tax_entry_tenant_tax_idx").on(table.tenantId, table.taxType, table.status),
+    index("tax_entry_tenant_neighborhood_idx").on(table.tenantId, table.neighborhood),
+  ],
+);
+
 export const ingestionReceipts = mysqlTable(
   "ingestion_receipts",
   {

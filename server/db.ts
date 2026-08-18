@@ -13,6 +13,7 @@ import {
   municipalities,
   municipalServices,
   projects,
+  taxLedgerEntries,
   transparencyRecords,
   users,
 } from "../drizzle/schema";
@@ -271,6 +272,146 @@ export async function recordIngestion(input: {
   });
   const receipt = (await db.select().from(ingestionReceipts).where(eq(ingestionReceipts.id, receiptId)).limit(1))[0];
   return { receipt, duplicate: false };
+}
+
+export type TaxLedgerRecordInput = {
+  externalId: string;
+  fiscalYear: number;
+  referenceMonth: number;
+  taxType: "IPTU" | "ISS" | "ITBI" | "TAXA" | "CONTRIBUICAO" | "MULTA" | "OUTROS";
+  taxCategory?: string;
+  taxpayerName?: string;
+  taxpayerDocument?: string;
+  taxpayerType?: "PF" | "PJ" | "NA";
+  neighborhood?: string;
+  propertyReference?: string;
+  propertyType?: string;
+  companyReference?: string;
+  cnae?: string;
+  status?: "lancado" | "pago" | "cancelado" | "isento" | "em_aberto" | "divida_ativa";
+  assessedAmount?: number;
+  collectedAmount?: number;
+  cancelledAmount?: number;
+  exemptAmount?: number;
+  outstandingAmount?: number;
+  propertyTransactionValue?: number;
+  activeDebtOriginal?: number;
+  activeDebtCorrection?: number;
+  activeDebtInterest?: number;
+  activeDebtPenalty?: number;
+  activeDebtStatus?: "nao_inscrita" | "inscrita" | "ajuizada" | "parcelada" | "cancelada" | "prescrita";
+  dueDate?: string;
+  paidDate?: string;
+  sourceUpdatedAt?: string;
+};
+
+const money = (value: number | undefined) => (value ?? 0).toFixed(2);
+
+export async function upsertTaxLedgerEntries(tenantId: string, records: TaxLedgerRecordInput[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Banco de dados indisponível");
+  for (const record of records) {
+    const values = {
+      id: `tax-${nanoid(14)}`,
+      tenantId,
+      externalId: record.externalId,
+      fiscalYear: record.fiscalYear,
+      referenceMonth: record.referenceMonth,
+      taxType: record.taxType,
+      taxCategory: record.taxCategory ?? null,
+      taxpayerName: record.taxpayerName ?? null,
+      taxpayerDocument: record.taxpayerDocument ?? null,
+      taxpayerType: record.taxpayerType ?? "NA" as const,
+      neighborhood: record.neighborhood ?? null,
+      propertyReference: record.propertyReference ?? null,
+      propertyType: record.propertyType ?? null,
+      companyReference: record.companyReference ?? null,
+      cnae: record.cnae ?? null,
+      status: record.status ?? "lancado" as const,
+      assessedAmount: money(record.assessedAmount),
+      collectedAmount: money(record.collectedAmount),
+      cancelledAmount: money(record.cancelledAmount),
+      exemptAmount: money(record.exemptAmount),
+      outstandingAmount: money(record.outstandingAmount),
+      propertyTransactionValue: record.propertyTransactionValue === undefined ? null : money(record.propertyTransactionValue),
+      activeDebtOriginal: money(record.activeDebtOriginal),
+      activeDebtCorrection: money(record.activeDebtCorrection),
+      activeDebtInterest: money(record.activeDebtInterest),
+      activeDebtPenalty: money(record.activeDebtPenalty),
+      activeDebtStatus: record.activeDebtStatus ?? "nao_inscrita" as const,
+      dueDate: record.dueDate ?? null,
+      paidDate: record.paidDate ?? null,
+      sourceUpdatedAt: record.sourceUpdatedAt ? new Date(record.sourceUpdatedAt) : null,
+      updatedAt: new Date(),
+    };
+    await db.insert(taxLedgerEntries).values(values).onDuplicateKeyUpdate({
+      set: { ...values, id: sql`id`, createdAt: sql`createdAt` },
+    });
+  }
+  return { processed: records.length };
+}
+
+export async function completeIngestion(receiptId: string, status: "completed" | "error" = "completed") {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(ingestionReceipts).set({ status }).where(eq(ingestionReceipts.id, receiptId));
+}
+
+export type TaxFilters = { tenantId: string; fiscalYear?: number; referenceMonth?: number; taxType?: TaxLedgerRecordInput["taxType"]; neighborhood?: string; taxpayerType?: "PF" | "PJ" | "NA"; status?: TaxLedgerRecordInput["status"] };
+
+export function filterTaxRows<T extends Pick<typeof taxLedgerEntries.$inferSelect, "fiscalYear" | "referenceMonth" | "taxType" | "neighborhood" | "taxpayerType" | "status">>(rows: T[], filters: TaxFilters) {
+  return rows.filter(row => (!filters.fiscalYear || row.fiscalYear === filters.fiscalYear) && (!filters.referenceMonth || row.referenceMonth === filters.referenceMonth) && (!filters.taxType || row.taxType === filters.taxType) && (!filters.neighborhood || row.neighborhood === filters.neighborhood) && (!filters.taxpayerType || row.taxpayerType === filters.taxpayerType) && (!filters.status || row.status === filters.status));
+}
+
+export function buildTaxAnalytics(rows: Array<typeof taxLedgerEntries.$inferSelect>) {
+  const totals = { assessed: 0, collected: 0, cancelled: 0, exempt: 0, outstanding: 0, activeDebt: 0, debtOriginal: 0, debtCorrection: 0, debtInterest: 0, debtPenalty: 0, transactionValue: 0 };
+  const monthly = new Map<string, { period: string; assessed: number; collected: number; outstanding: number }>();
+  const byTax = new Map<string, { taxType: string; assessed: number; collected: number; outstanding: number; activeDebt: number; entries: number }>();
+  const byNeighborhood = new Map<string, { neighborhood: string; assessed: number; collected: number; outstanding: number; transactionValue: number }>();
+  const debtStatus = new Map<string, number>();
+  const contributors = new Set<string>();
+  const properties = new Set<string>();
+  const companies = new Set<string>();
+
+  for (const row of rows) {
+    const assessed = numberValue(row.assessedAmount); const collected = numberValue(row.collectedAmount); const cancelled = numberValue(row.cancelledAmount); const exempt = numberValue(row.exemptAmount); const outstanding = numberValue(row.outstandingAmount); const debtOriginal = numberValue(row.activeDebtOriginal); const debtCorrection = numberValue(row.activeDebtCorrection); const debtInterest = numberValue(row.activeDebtInterest); const debtPenalty = numberValue(row.activeDebtPenalty); const activeDebt = debtOriginal + debtCorrection + debtInterest + debtPenalty; const transactionValue = numberValue(row.propertyTransactionValue);
+    totals.assessed += assessed; totals.collected += collected; totals.cancelled += cancelled; totals.exempt += exempt; totals.outstanding += outstanding; totals.activeDebt += activeDebt; totals.debtOriginal += debtOriginal; totals.debtCorrection += debtCorrection; totals.debtInterest += debtInterest; totals.debtPenalty += debtPenalty; totals.transactionValue += transactionValue;
+    const period = `${row.fiscalYear}-${String(row.referenceMonth).padStart(2, "0")}`;
+    const month = monthly.get(period) ?? { period, assessed: 0, collected: 0, outstanding: 0 }; month.assessed += assessed; month.collected += collected; month.outstanding += outstanding; monthly.set(period, month);
+    const tax = byTax.get(row.taxType) ?? { taxType: row.taxType, assessed: 0, collected: 0, outstanding: 0, activeDebt: 0, entries: 0 }; tax.assessed += assessed; tax.collected += collected; tax.outstanding += outstanding; tax.activeDebt += activeDebt; tax.entries += 1; byTax.set(row.taxType, tax);
+    if (row.neighborhood) { const neighborhood = byNeighborhood.get(row.neighborhood) ?? { neighborhood: row.neighborhood, assessed: 0, collected: 0, outstanding: 0, transactionValue: 0 }; neighborhood.assessed += assessed; neighborhood.collected += collected; neighborhood.outstanding += outstanding; neighborhood.transactionValue += transactionValue; byNeighborhood.set(row.neighborhood, neighborhood); }
+    debtStatus.set(row.activeDebtStatus, (debtStatus.get(row.activeDebtStatus) ?? 0) + activeDebt);
+    if (row.taxpayerDocument || row.taxpayerName) contributors.add(row.taxpayerDocument ?? row.taxpayerName!);
+    if (row.propertyReference) properties.add(row.propertyReference);
+    if (row.companyReference) companies.add(row.companyReference);
+  }
+
+  const realizationRate = totals.assessed > 0 ? (totals.collected / totals.assessed) * 100 : 0;
+  const delinquencyRate = totals.assessed > 0 ? (totals.outstanding / totals.assessed) * 100 : 0;
+  return {
+    totals: { ...totals, realizationRate, delinquencyRate, contributors: contributors.size, properties: properties.size, companies: companies.size, records: rows.length },
+    monthly: Array.from(monthly.values()).sort((a, b) => a.period.localeCompare(b.period)),
+    byTax: Array.from(byTax.values()).sort((a, b) => b.collected - a.collected),
+    byNeighborhood: Array.from(byNeighborhood.values()).sort((a, b) => b.outstanding - a.outstanding),
+    debtStatus: Array.from(debtStatus.entries()).map(([status, value]) => ({ status, value })).sort((a, b) => b.value - a.value),
+    topDebtors: rows.filter(row => numberValue(row.outstandingAmount) > 0).map(row => ({ taxpayerName: row.taxpayerName, taxpayerDocument: row.taxpayerDocument, taxType: row.taxType, neighborhood: row.neighborhood, outstanding: numberValue(row.outstandingAmount), dueDate: row.dueDate })).sort((a, b) => b.outstanding - a.outstanding).slice(0, 10),
+  };
+}
+
+export async function getTaxAnalytics(filters: TaxFilters) {
+  const db = await getDb();
+  const municipality = await resolveMunicipality(filters.tenantId);
+  if (!db || !municipality) return { municipality: null, analytics: buildTaxAnalytics([]), availableYears: [], availableNeighborhoods: [] };
+  const rules = [eq(taxLedgerEntries.tenantId, filters.tenantId)];
+  if (filters.fiscalYear) rules.push(eq(taxLedgerEntries.fiscalYear, filters.fiscalYear));
+  if (filters.referenceMonth) rules.push(eq(taxLedgerEntries.referenceMonth, filters.referenceMonth));
+  if (filters.taxType) rules.push(eq(taxLedgerEntries.taxType, filters.taxType));
+  if (filters.neighborhood) rules.push(eq(taxLedgerEntries.neighborhood, filters.neighborhood));
+  if (filters.taxpayerType) rules.push(eq(taxLedgerEntries.taxpayerType, filters.taxpayerType));
+  if (filters.status) rules.push(eq(taxLedgerEntries.status, filters.status));
+  const rows = await db.select().from(taxLedgerEntries).where(and(...rules)).orderBy(desc(taxLedgerEntries.fiscalYear), desc(taxLedgerEntries.referenceMonth)).limit(10000);
+  const allRows = await db.select({ fiscalYear: taxLedgerEntries.fiscalYear, neighborhood: taxLedgerEntries.neighborhood }).from(taxLedgerEntries).where(eq(taxLedgerEntries.tenantId, filters.tenantId)).limit(10000);
+  return { municipality, analytics: buildTaxAnalytics(filterTaxRows(rows, filters)), availableYears: Array.from(new Set(allRows.map(row => row.fiscalYear))).sort((a, b) => b - a), availableNeighborhoods: Array.from(new Set(allRows.map(row => row.neighborhood).filter(Boolean) as string[])).sort() };
 }
 
 export async function getMembership(userId: number, municipalityId: string) {

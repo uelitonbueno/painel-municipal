@@ -18,6 +18,13 @@ function Router() {
     <Route path="/indicadores" component={IndicatorsPage} />
     <Route path="/transparencia" component={TransparencyPage} />
     <Route path="/servicos" component={ServicesPage} />
+    <Route path="/admin/tributos" component={AdminPages} />
+    <Route path="/admin/tributos/arrecadacao" component={AdminPages} />
+    <Route path="/admin/tributos/iptu" component={AdminPages} />
+    <Route path="/admin/tributos/iss" component={AdminPages} />
+    <Route path="/admin/tributos/itbi" component={AdminPages} />
+    <Route path="/admin/tributos/inadimplencia" component={AdminPages} />
+    <Route path="/admin/tributos/divida-ativa" component={AdminPages} />
     <Route path="/admin/:rest*?" component={AdminPages} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />

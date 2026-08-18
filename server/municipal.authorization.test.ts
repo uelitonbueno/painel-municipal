@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listReceipts: vi.fn(),
   listMunicipalitiesForUser: vi.fn(),
   getPublicDashboard: vi.fn(),
+  getTaxAnalytics: vi.fn(),
   authorizeMunicipalUser: vi.fn(),
   createMunicipality: vi.fn(),
   assignOwnerMembership: vi.fn(),
@@ -51,6 +52,13 @@ describe("municipal.public security", () => {
     const caller = municipalRouter.createCaller(context());
     await expect(caller.public.dashboard({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.getPublicDashboard).not.toHaveBeenCalled();
+  });
+
+  it("nega o BI Tributário a uma conta sem vínculo na prefeitura", async () => {
+    mocks.getMembership.mockResolvedValue(undefined);
+    const caller = municipalRouter.createCaller(context());
+    await expect(caller.public.taxAnalytics({ tenantId: "mun-de-outra-prefeitura" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.getTaxAnalytics).not.toHaveBeenCalled();
   });
 
   it("mostra somente as prefeituras vinculadas ao usuário e permite visão transversal ao superusuário", async () => {
