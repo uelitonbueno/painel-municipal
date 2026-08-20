@@ -78,3 +78,4 @@
 - [x] Estender o novo sistema visual à área de consulta autenticada, preservando a clareza de transparência e serviços.
 - [x] Validar em mobile as telas administrativas gerais e a área de consulta após a atualização visual.
 - [x] Validar o contraste e a legibilidade de Serviços, Indicadores e Transparência em desktop e mobile após o novo tema.
+- [ ] Exportar o projeto Painel Municipal para o GitHub em repositório ou pasta `painel-municipal`.
